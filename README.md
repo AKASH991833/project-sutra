@@ -15,3 +15,12 @@ PDF output is high-resolution raster pages matching the preview, including Hindi
 Node 20+: `npm ci` then `npm run build`. Serve this directory as static files. Libraries are bundled locally into `app.js`; runtime needs no third-party CDN. `index.html`, `style.css` and `app.js` are the deploy files. Dependencies: docx (MIT), jsPDF (MIT), html2canvas (MIT). Dependency notices are supplied in the repository.
 
 The example is fictional, and the diagram is illustrative. It must not be submitted as original research.
+
+
+## Reference-style black book update
+
+Black books use bordered A4 pages, Times-style serif text, centered underlined main headings, justified paragraphs and centered page numbers. Front matter: cover, title page, unsigned director recommendation and certificate templates, acknowledgement, abstract, then contents and numbered chapters. Institution details, degree/university and individual student PRNs are editable. No real student report or private reference details are included in this repository.
+
+Use `# Chapter title` for chapters, `## Subheading` or `1.1 Subheading` for subsections. Separate paragraphs with a blank line. Each black book chapter starts on a new page. PDF matches the preview; DOCX can reflow in another word processor, so check its page numbers after editing.
+
+Current deploy files: `index.html`, `4-style.css`, `1-app.js`. Current editable source: `2-src.js`. The unprefixed JS/CSS files are the earlier version and are not used by the updated website. `npm run build` rebuilds the current bundle from `2-src.js`.
