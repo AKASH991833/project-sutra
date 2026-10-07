@@ -1,4 +1,4 @@
-# Project Sutra
+# Documents & Projects Creator
 
 A free, local-first academic document formatter by Akash. Paste your own content, add images, organise sections and export an A4 PDF or editable Word document. Assignment, project and general black book templates.
 
@@ -23,4 +23,9 @@ Black books use bordered A4 pages, Times-style serif text, centered underlined m
 
 Use `# Chapter title` for chapters, `## Subheading` or `1.1 Subheading` for subsections. Separate paragraphs with a blank line. Each black book chapter starts on a new page. PDF matches the preview; DOCX can reflow in another word processor, so check its page numbers after editing.
 
-Current deploy files: `index.html`, `4-style.css`, `1-app.js`. Current editable source: `2-src.js`. The unprefixed JS/CSS files are the earlier version and are not used by the updated website. `npm run build` rebuilds the current bundle from `2-src.js`.
+Current deploy files: `index.html`, `3-creator.css`, `1-creator.js`. Current editable source: `2-creator-source.js`. The unprefixed JS/CSS files are the earlier version and are not used by the updated website. `npm run build` rebuilds the current bundle from `2-creator-source.js`.
+
+
+## Workflow polish
+
+Text-file import, character count, editable section bodies, confirmed demo/reset replacement, missing-details review notices, preview page navigation, full-size preview and build/export control locking. Project backup format remains compatible with earlier versions. Old public links continue to work at the same GitHub Pages address. This is a local formatter, not a guarantee of research correctness or institution approval.
