@@ -36,7 +36,10 @@ async function gemini(system, user, schema) {
       const t = j?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
       try { return JSON.parse(t); } catch { last = new Error('AI returned an unreadable answer. Try again.'); continue; }
     }
-    last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error.'), { status: r.status === 429 ? 429 : 502 });
+    let detail = '';
+    try { const ej = await r.json(); detail = String(ej?.error?.message || '').replace(/key[^ ]*/gi, '').slice(0, 160); } catch {}
+    console.log('gemini', model, r.status, detail);
+    last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error (' + model + ' ' + (r.status || 'network') + '): ' + detail), { status: r.status === 429 ? 429 : 502 });
     if (r.status === 429) break;
   }
   throw last || new Error('AI service error.');
