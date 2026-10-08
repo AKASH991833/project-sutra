@@ -112,7 +112,8 @@ module.exports = async (req, res) => {
     }
     if (b.task === 'section') {
       const topic = clip(b.topic, 300), title = clip(b.title, 120), details = clip(b.details, 600);
-      const outline = Array.isArray(b.outline) ? b.outline.slice(0, 20).map(s => clip(s, 80)).join(' | ') : '';
+      let n = 0;
+      const outline = Array.isArray(b.outline) ? b.outline.slice(0, 20).map(s => clip(s, 80)).map(t => (type === 'blackbook' && !/abstract|सारांश/i.test(t)) ? (++n) + '. ' + t : t).join(' | ') : '';
       const chapterNo = Math.max(0, Math.min(40, parseInt(b.chapterNo, 10) || 0));
       const words = type === 'assignment'
         ? { short: '90 to 140', medium: '160 to 260', long: '300 to 450' }[b.length] || '160 to 260'
@@ -120,7 +121,7 @@ module.exports = async (req, res) => {
       if (topic.length < 3 || !title) return res.status(400).json({ error: 'Missing topic or title.' });
       const abs = /abstract/i.test(title);
       const numbering = type === 'blackbook' && chapterNo && !abs ? ` If you use subheadings, number them ${chapterNo}.1, ${chapterNo}.2 and so on, for example "## ${chapterNo}.1 Background".` : ' If you use subheadings, do not number them.';
-      const out = await gemini(STYLE, `Document type: ${type === 'blackbook' ? 'final-year project report (black book)' : type === 'assignment' ? 'assignment' : 'project report'}.\nTopic: "${topic}".\n${details ? 'Student-provided details (use only these for specific technologies, names or facts): ' + details + '\n' : ''}All sections in order: ${outline}.\nNow write ONLY the section titled "${title}" in ${L}. Length: about ${words} words in total.\nSection guidance: ${guideFor(title)}${numbering}\nDo not repeat the section title as a heading. Do not repeat content that clearly belongs to other sections.`,
+      const out = await gemini(STYLE, `Document type: ${type === 'blackbook' ? 'final-year project report (black book)' : type === 'assignment' ? 'assignment' : 'project report'}.\nTopic: "${topic}".\n${details ? 'Student-provided details (use only these for specific technologies, names or facts): ' + details + '\n' : ''}All sections in order: ${outline}.\nNow write ONLY the section titled "${title}" in ${L}. Length: about ${words} words in total.\nSection guidance: ${guideFor(title)}${numbering}\nChapter numbers, if you refer to other sections, must match the numbered list above exactly; if unsure, do not mention numbers. Do not repeat the section title as a heading. Do not repeat content that clearly belongs to other sections.`,
         { type: 'OBJECT', properties: { paragraphs: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['paragraphs'] });
       return res.status(200).json({ paragraphs: (out.paragraphs || []).map(p => clip(p, 4000)).slice(0, 14) });
     }
