@@ -23,7 +23,9 @@ async function gemini(system, user, schema) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw Object.assign(new Error('AI is not configured yet.'), { status: 503 });
   let last;
-  for (const model of MODELS) {
+  const started = Date.now();
+  for (const model of MODELS) for (let attempt = 0; attempt < 3; attempt++) {
+    if (Date.now() - started > 45000) break;
     const generationConfig = { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7, maxOutputTokens: 8192 };
     if (model.includes('2.5')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -41,6 +43,8 @@ async function gemini(system, user, schema) {
     console.log('gemini', model, r.status, detail);
     last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error (' + model + ' ' + (r.status || 'network') + '): ' + detail), { status: r.status === 429 ? 429 : 502 });
     if (r.status === 429) break;
+    if (r.status >= 500 || r.status === 0) { await new Promise(z => setTimeout(z, 1500 * (attempt + 1))); continue; }
+    break;
   }
   throw last || new Error('AI service error.');
 }
