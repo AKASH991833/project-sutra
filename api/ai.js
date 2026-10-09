@@ -1,6 +1,6 @@
 // Server-side Gemini proxy for Documents & Projects Creator.
 // The Gemini key lives only in the GEMINI_API_KEY environment variable on the host. It is never sent to the browser.
-const MODELS = (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-2.5-flash,gemini-2.0-flash').split(',');
+const MODELS = (process.env.GEMINI_MODELS || 'gemini-flash-latest').split(',');
 const ALLOWED = (process.env.ALLOWED_ORIGINS || 'https://akash991833.github.io').split(',').map(s => s.trim());
 const LANGS = { en: 'English', hi: 'Hindi (Devanagari script)', mr: 'Marathi (Devanagari script)' };
 const hits = new Map();
@@ -23,15 +23,17 @@ async function gemini(system, user, schema) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw Object.assign(new Error('AI is not configured yet.'), { status: 503 });
   let last;
+  const noThink = new Set();
   const started = Date.now();
   for (const model of MODELS) for (let attempt = 0; attempt < 3; attempt++) {
     if (Date.now() - started > 45000) break;
-    const generationConfig = { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7, maxOutputTokens: 8192 };
-    if (model.includes('2.5')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    const generationConfig = { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7, maxOutputTokens: 4096 };
+    if (!noThink.has(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig })
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts: [{ text: user }] }], generationConfig }),
+      signal: AbortSignal.timeout(40000)
     }).catch(e => ({ ok: false, status: 0, _e: e }));
     if (r.ok) {
       const j = await r.json();
@@ -41,6 +43,7 @@ async function gemini(system, user, schema) {
     let detail = '';
     try { const ej = await r.json(); detail = String(ej?.error?.message || '').replace(/key[^ ]*/gi, '').slice(0, 160); } catch {}
     console.log('gemini', model, r.status, detail);
+    if (r.status === 400 && !noThink.has(model) && /think/i.test(detail)) { noThink.add(model); attempt--; continue; }
     last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error (' + model + ' ' + (r.status || 'network') + '): ' + detail), { status: r.status === 429 ? 429 : 502 });
     if (r.status === 429) break;
     if (r.status >= 500 || r.status === 0) { await new Promise(z => setTimeout(z, 1500 * (attempt + 1))); continue; }
