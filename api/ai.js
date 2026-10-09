@@ -27,7 +27,7 @@ async function gemini(system, user, schema) {
   const started = Date.now();
   for (const model of MODELS) for (let attempt = 0; attempt < 3; attempt++) {
     if (Date.now() - started > 45000) break;
-    const generationConfig = { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7, maxOutputTokens: 4096 };
+    const generationConfig = { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.7, maxOutputTokens: 8192 };
     if (!noThink.has(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
@@ -41,10 +41,10 @@ async function gemini(system, user, schema) {
       try { return JSON.parse(t); } catch { last = new Error('AI returned an unreadable answer. Try again.'); continue; }
     }
     let detail = '';
-    try { const ej = await r.json(); detail = String(ej?.error?.message || '').replace(/key[^ ]*/gi, '').slice(0, 160); } catch {}
-    console.log('gemini', model, r.status, detail);
+    let daily = false; try { const ej = await r.json(); const raw = JSON.stringify(ej?.error || {}); daily = /PerDay|per day/i.test(raw); detail = String(ej?.error?.message || '').replace(/key[^ ]*/gi, '').slice(0, 160); } catch {}
+    let full = detail; console.log('gemini', model, r.status, detail);
     if (r.status === 400 && !noThink.has(model) && /think/i.test(detail)) { noThink.add(model); attempt--; continue; }
-    last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error (' + model + ' ' + (r.status || 'network') + '): ' + detail), { status: r.status === 429 ? 429 : 502 });
+    last = Object.assign(new Error(r.status === 429 ? 'AI is busy right now (free limit). Wait a few seconds and try again.' : 'AI service error (' + model + ' ' + (r.status || 'network') + '): ' + detail), { status: r.status === 429 ? 429 : 502, daily });
     if (r.status === 429) break;
     if (r.status >= 500 || r.status === 0) { await new Promise(z => setTimeout(z, 1500 * (attempt + 1))); continue; }
     break;
@@ -128,6 +128,21 @@ module.exports = async (req, res) => {
         { type: 'OBJECT', properties: { paragraphs: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['paragraphs'] });
       return res.status(200).json({ paragraphs: (out.paragraphs || []).map(p => clip(p, 4000)).slice(0, 14) });
     }
+    if (b.task === 'sections') {
+      const topic = clip(b.topic, 300), details = clip(b.details, 600);
+      const titles = Array.isArray(b.titles) ? b.titles.slice(0, 4).map(t => clip(t, 120)).filter(Boolean) : [];
+      if (topic.length < 3 || !titles.length) return res.status(400).json({ error: 'Missing topic or titles.' });
+      let n = 0;
+      const outline = Array.isArray(b.outline) ? b.outline.slice(0, 20).map(t => clip(t, 80)).map(t => (type === 'blackbook' && !/abstract|सारांश/i.test(t)) ? (++n) + '. ' + t : t).join(' | ') : '';
+      const per = type === 'assignment'
+        ? { short: '90 to 140', medium: '160 to 260', long: '300 to 450' }[b.length] || '160 to 260'
+        : { short: '120 to 180', medium: '220 to 330', long: '400 to 560' }[b.length] || '220 to 330';
+      const nos = Array.isArray(b.chapterNos) ? b.chapterNos : [];
+      const guides = titles.map((t, i) => `- "${t}"${type === 'blackbook' && nos[i] && !/abstract/i.test(t) ? ' (chapter ' + (parseInt(nos[i], 10) || 0) + '; number subheadings ' + (parseInt(nos[i], 10) || 0) + '.1, ' + (parseInt(nos[i], 10) || 0) + '.2 ...)' : ''}: ${guideFor(t)}`).join('\n');
+      const out = await gemini(STYLE, `Document type: ${type === 'blackbook' ? 'final-year project report (black book)' : type === 'assignment' ? 'assignment' : 'project report'}.\nTopic: "${topic}".\n${details ? 'Student-provided details (use only these for specific technologies, names or facts): ' + details + '\n' : ''}All sections in order: ${outline}.\nWrite ONLY these sections, in this order, each about ${per} words, in ${L}:\n${guides}\nDo not repeat a section title as a heading. Do not repeat content that belongs to other sections. If you refer to chapter numbers they must match the list above exactly; if unsure, do not mention numbers.`,
+        { type: 'OBJECT', properties: { sections: { type: 'ARRAY', items: { type: 'OBJECT', properties: { title: { type: 'STRING' }, paragraphs: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['paragraphs'] } } }, required: ['sections'] });
+      return res.status(200).json({ sections: (out.sections || []).slice(0, titles.length).map(x => ({ paragraphs: (x.paragraphs || []).map(p => clip(p, 4000)).slice(0, 12) })) });
+    }
     if (b.task === 'diagram') {
       const text = clip(b.text, 3500), title = clip(b.title, 120);
       if (text.length < 40) return res.status(400).json({ error: 'Not enough text.' });
@@ -137,6 +152,6 @@ module.exports = async (req, res) => {
     }
     return res.status(400).json({ error: 'Unknown task.' });
   } catch (e) {
-    return res.status(e.status || 500).json({ error: e.message || 'Server error' });
+    return res.status(e.status || 500).json({ error: e.daily ? 'The free daily AI limit is used up. It resets tomorrow (about 12:30 PM IST). Your finished sections are kept.' : (e.message || 'Server error'), daily: !!e.daily });
   }
 };
