@@ -1,6 +1,6 @@
 // Server-side Gemini proxy for Documents & Projects Creator.
 // The Gemini key lives only in the GEMINI_API_KEY environment variable on the host. It is never sent to the browser.
-const MODELS = (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.0-flash,gemini-flash-latest').split(',');
+const MODELS = (process.env.GEMINI_MODELS || 'gemini-flash-latest,gemini-2.5-flash,gemini-2.0-flash').split(',');
 const ALLOWED = (process.env.ALLOWED_ORIGINS || 'https://akash991833.github.io').split(',').map(s => s.trim());
 const LANGS = { en: 'English', hi: 'Hindi (Devanagari script)', mr: 'Marathi (Devanagari script)' };
 const hits = new Map();
